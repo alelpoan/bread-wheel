@@ -1,0 +1,61 @@
+name: Bread Wheel MASM Build
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "miden/masm/**"
+      - ".github/workflows/bread-masm.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout Bread Wheel
+        uses: actions/checkout@v4
+        with:
+          path: bread-wheel
+
+      - name: Checkout GeoQuizz compiler environment
+        uses: actions/checkout@v4
+        with:
+          repository: guelowrd/gq-thegamenotthemagazine
+          ref: 32854f907f305a6df49041fbc8ed4432e8ffafb0
+          path: geoquizz
+
+      - name: Install Rust
+        run: rustup toolchain install nightly-2026-09-01 --profile minimal
+
+      - name: Create Bread Wheel compiler
+        shell: bash
+        run: |
+          cat > geoquizz/integration/src/bin/bread_stake.rs <<'RS'
+          use anyhow::Result;
+          use miden_standards::code_builder::CodeBuilder;
+
+          fn main() -> Result<()> {
+              let module = include_str!("../../../../bread-wheel/miden/masm/stake.masm");
+              let script = r#"
+          use.bread::stake
+
+          begin
+              push.1
+              exec.bread::stake::valid_stake
+              assert
+          end
+          "#;
+
+              let builder = CodeBuilder::default()
+                  .with_linked_module("bread::stake", module)?;
+
+              let compiled = builder.compile_note_script(script)?;
+              println!("Bread Wheel stake script root: {}", compiled.root());
+              Ok(())
+          }
+          RS
+
+      - name: Compile Bread Wheel MASM
+        working-directory: geoquizz
+        run: cargo +nightly-2026-09-01 run --release --bin bread_stake
