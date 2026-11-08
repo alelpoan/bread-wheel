@@ -1,0 +1,8 @@
+# Bread Wheel - stake validation
+# Input: stake
+# Output: 1 if stake > 0, otherwise 0
+
+pub proc valid_stake
+    push.0
+    gt
+end
