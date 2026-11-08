@@ -1,0 +1,29 @@
+﻿name: Miden Linux Build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - name: Download GeoQuizz
+        uses: actions/checkout@v4
+        with:
+          repository: guelowrd/gq-thegamenotthemagazine
+          ref: 32854f907f305a6df49041fbc8ed4432e8ffafb0
+
+      - name: Install Rust
+        run: rustup toolchain install nightly-2026-09-01 --profile minimal
+
+      - name: Build MASM scripts
+        run: cargo +nightly-2026-09-01 run --release --bin build_scripts
+
+      - name: Save compiled scripts
+        uses: actions/upload-artifact@v4
+        with:
+          name: geoquizz-masm-scripts
+          path: web/public/scripts/*.bin
+          if-no-files-found: error
