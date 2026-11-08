@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+﻿import { useEffect, useRef, useState } from 'react'
 import './App.css'
 
 type Player = { id: number; name: string; balance: number; bet: number; color: string }
@@ -140,8 +140,8 @@ function App() {
 
     if (active.length < 2 || total <= 0) {
       setPlayers(previous => previous.map(p => ({ ...p, balance: p.balance + p.bet, bet: 0 })))
-      setMessage('Round cancelled — bets refunded (at least 2 bettors required)')
-      setHistory(previous => [{ round: currentRound, winner: 'No winner', amount: 0, status: 'cancelled' }, ...previous].slice(0, 50))
+      setMessage('Round cancelled вЂ” bets refunded (at least 2 bettors required)')
+      setHistory(previous => [{ round: currentRound, winner: 'No winner', amount: 0, status: 'cancelled' as const }, ...previous].slice(0, 50))
       finishRound()
       return
     }
@@ -168,7 +168,7 @@ function App() {
       setPlayers(previous => previous.map(p => p.id === selected.id ? { ...p, balance: p.balance + total } : p))
       setWinner(selected)
       setMessage(`${selected.name} wins ${total} coins!`)
-      setHistory(previous => [{ round: currentRound, winner: selected.name, amount: total, status: 'paid' }, ...previous].slice(0, 50))
+      setHistory(previous => [{ round: currentRound, winner: selected.name, amount: total, status: 'paid' as const }, ...previous].slice(0, 50))
       finishRound()
     }, SPIN_SECONDS * 1000)
   }
@@ -226,7 +226,7 @@ function App() {
       </div>
       {phase === 'betting' && <p className="status-text">Place your bets before the timer runs out! ({activeCount} bettors)</p>}
       {phase === 'spinning' && <p className="status-text">Bets are locked. Selecting the winner...</p>}
-      {phase === 'result' && <h2 className="winner">{winner ? '🏆 ' : ''}{message}</h2>}
+      {phase === 'result' && <h2 className="winner">{winner ? 'рџЏ† ' : ''}{message}</h2>}
       <section className="lobby">
         <h2>Test Lobby</h2>
         <p>New players start with {START_BALANCE} virtual coins</p>
@@ -248,3 +248,5 @@ function App() {
 }
 
 export default App
+
+
