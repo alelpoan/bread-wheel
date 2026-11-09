@@ -149,3 +149,45 @@ async fn owner_can_refund_after_deadline_once() -> Result<()> {
     println!("PASS: owner refund 1 GC, no double spend");
     Ok(())
 }
+
+// Exercise a nonzero deadline against advancing MockChain reference blocks.
+// The chain must reject refunds before the deadline, then permit exactly one
+// successful consumption after enough blocks have been produced.
+#[tokio::test(flavor = "multi_thread")]
+async fn refund_becomes_available_only_after_blocks_advance() -> Result<()> {
+    const DEADLINE: u32 = 8;
+    let mut g = setup(DEADLINE)?;
+    let initial = g.balance(g.owner.id());
+    g.publish().await?;
+    assert_eq!(g.balance(g.owner.id()), initial - UNIT);
+
+    // Publishing one note must not immediately unlock a future-block refund.
+    assert!(g.refund(g.owner.id()).await.is_err(), "future deadline must initially lock the stake");
+    assert_eq!(g.balance(g.owner.id()), initial - UNIT);
+
+    let mut successful_refund = None;
+    let mut rejected_attempts = 1usize;
+    // Empty blocks are intentionally proven to move the chain reference height.
+    // The bound avoids a hanging test if the SDK's height semantics change.
+    for _ in 0..20 {
+        g.chain.prove_next_block()?;
+        match g.refund(g.owner.id()).await {
+            Ok(tx) => { successful_refund = Some(tx); break; }
+            Err(_) => {
+                rejected_attempts += 1;
+                assert_eq!(g.balance(g.owner.id()), initial - UNIT);
+            }
+        }
+    }
+    let tx = successful_refund.expect("refund must become valid after advancing past deadline");
+    assert!(rejected_attempts >= 1, "at least one early refund must fail");
+    g.commit(&tx)?;
+    assert_eq!(g.balance(g.owner.id()), initial, "exactly 1 GC must return to owner");
+    let again = g.refund(g.owner.id()).await;
+    if let Ok(tx2) = again {
+        assert!(g.commit(&tx2).is_err(), "note cannot be consumed twice");
+    }
+    assert_eq!(g.balance(g.owner.id()), initial);
+    println!("PASS: nonzero deadline reached after {rejected_attempts} early rejections");
+    Ok(())
+}
