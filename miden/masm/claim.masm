@@ -1,4 +1,4 @@
-﻿#! Bread Wheel claim module - compiler smoke test only.
+#! Bread Wheel claim module - compiler smoke test only.
 #! No token transfers or ownership checks.
 
 pub proc claim_owner
