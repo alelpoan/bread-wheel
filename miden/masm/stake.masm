@@ -1,8 +1,33 @@
-# Bread Wheel - stake validation
-# Input: stake
-# Output: 1 if stake > 0, otherwise 0
+#! Bread Wheel Stake Note — Phase 1: locked stake with owner-only timeout refund.
+#! Storage (4 felts): [owner_suffix, owner_prefix, round_id, refund_after_block].
+#! A note's Gamecoin assets are locked until the refund block. Only the owner
+#! may consume the note. There is intentionally NO winner/settlement path yet.
+#! This is a MockChain prototype; do not send real GC to this script.
 
-pub proc valid_stake
-    push.0
-    gt
+use miden::protocol::active_account
+use miden::protocol::active_note
+use miden::protocol::account_id
+use miden::protocol::tx
+use miden::standards::wallets::basic
+
+const ERR_NOT_OWNER = "wheel stake: only original staker can refund"
+const ERR_TOO_EARLY = "wheel stake: refund block not reached"
+
+pub proc refund_owner_after_deadline
+    # Read exactly four storage felts into memory 0..3.
+    push.4 push.0
+    exec.active_note::get_bounded_storage
+    eq.4 assert
+
+    # Verify consuming account matches the owner stored in this note.
+    mem_load.1 mem_load.0
+    exec.active_account::get_id
+    exec.account_id::eq
+    assert.err=ERR_NOT_OWNER
+
+    # Require reference block >= refund_after_block.
+    exec.tx::get_reference_block_number mem_load.3
+    lt assertz.err=ERR_TOO_EARLY
+
+    exec.basic::move_note_assets_to_account
 end

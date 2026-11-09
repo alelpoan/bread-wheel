@@ -1,0 +1,33 @@
+name: Bread Wheel Stake Note MockChain Tests
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'miden/masm/stake.masm'
+      - 'miden/tests/wheel_stake_test.rs'
+      - '.github/workflows/bread-stake-test.yml'
+  workflow_dispatch:
+
+jobs:
+  stake-note:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-09-01
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/checkout@v4
+        with:
+          repository: guelowrd/gq-thegamenotthemagazine
+          ref: 32854f907f305a6df49041fbc8ed4432e8ffafb0
+          path: geoquizz-reference
+      - name: Install Bread Wheel stake module and tests
+        run: |
+          cp miden/masm/stake.masm geoquizz-reference/masm/bread_stake.masm
+          cp miden/tests/wheel_stake_test.rs geoquizz-reference/integration/tests/wheel_stake_test.rs
+      - name: Compile and execute stake tests
+        working-directory: geoquizz-reference/integration
+        run: cargo +nightly-2026-09-01 test --test wheel_stake_test -- --nocapture
