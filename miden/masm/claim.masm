@@ -1,7 +1,23 @@
-#! Bread Wheel claim module - compiler smoke test only.
-#! No token transfers or ownership checks.
+#! Bread Wheel - single-player claim prototype.
+#! Note storage contains owner suffix and prefix.
+#! Only the specified owner may receive the note assets.
+
+use miden::protocol::active_account
+use miden::protocol::active_note
+use miden::protocol::account_id
+use miden::standards::wallets::basic
+
+const ERR_NOT_OWNER = "wheel: only the owner can claim"
 
 pub proc claim_owner
-    push.1
-    assert
+    push.4 push.0
+    exec.active_note::get_bounded_storage
+    drop
+
+    mem_load.1 mem_load.0
+    exec.active_account::get_id
+    exec.account_id::eq
+    assert.err=ERR_NOT_OWNER
+
+    exec.basic::move_note_assets_to_account
 end
