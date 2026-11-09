@@ -1,0 +1,32 @@
+/* Bread Wheel layout only. Does not modify game state, transactions, or bets. */
+#root { max-width: none !important; width: 100%; margin: 0 auto; padding: 0 !important; }
+.bread-dashboard { box-sizing: border-box; width: min(1380px, 100%); margin: 0 auto; padding: 18px 24px 44px; color: #29243e; }
+.bread-dashboard *, .bread-dashboard *::before, .bread-dashboard *::after { box-sizing: border-box; }
+.bread-dashboard-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 12px 0 18px; border-bottom: 1px solid #e9e5f2; }
+.bread-brand { display: flex; flex-direction: column; gap: 4px; text-align: left; }
+.bread-brand strong { font-size: 22px; letter-spacing: .03em; }
+.bread-brand span { font-size: 12px; color: #8b83a2; }
+.bread-wallet-controls { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; min-width: 0; }
+.bread-wallet-controls > * { max-width: 100%; }
+.bread-header-balance { font-size: 13px; }
+.bread-dashboard-columns { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(320px, 0.9fr); gap: 26px; align-items: start; padding-top: 24px; }
+.bread-game-column, .bread-sidebar { min-width: 0; }
+.bread-game-column .game { width: 100% !important; max-width: 100% !important; margin: 0 auto !important; padding: 0 !important; }
+.bread-game-column .game > h1 { margin-top: 0; }
+.bread-game-column .players { max-width: 100%; }
+.bread-sidebar { display: flex; flex-direction: column; gap: 16px; position: sticky; top: 16px; }
+.bread-sidebar > section { width: 100%; max-width: none !important; margin: 0 !important; }
+.bread-sidebar > section h2 { font-size: 20px; }
+.bread-safety-note { padding: 12px 15px; border-radius: 10px; background: #f5f3fb; color: #746b8b; font-size: 12px; line-height: 1.5; text-align: left; }
+@media (max-width: 860px) {
+  .bread-dashboard { padding: 12px 14px 32px; }
+  .bread-dashboard-header { align-items: flex-start; flex-wrap: wrap; }
+  .bread-wallet-controls { align-items: flex-start; }
+  .bread-dashboard-columns { display: flex; flex-direction: column; gap: 22px; padding-top: 18px; }
+  .bread-game-column, .bread-sidebar { width: 100%; }
+  .bread-sidebar { position: static; }
+}
+
+/* Demo panel is rendered in the sidebar via React portal, keeping App game state intact. */
+.bread-demo-wallet-slot { width: 100%; min-width: 0; }
+.bread-demo-wallet-slot > section { width: 100%; max-width: none !important; margin: 0 !important; }

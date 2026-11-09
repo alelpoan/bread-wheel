@@ -1,10 +1,10 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AccountId } from '@miden-sdk/miden-sdk'
 import { useMidenFiWallet } from '@miden-sdk/miden-wallet-adapter-react'
 
 const GC_FAUCET = '0x34a3510213533f512ec4abe36baf84'
 
-export default function GamecoinBalance() {
+export default function GamecoinBalance({ onBalanceChange }: { onBalanceChange?: (balance: bigint | null) => void }) {
   const { connected, address, requestAssets } = useMidenFiWallet()
   const [balance, setBalance] = useState<string | null>(null)
   const [error, setError] = useState('')
@@ -14,6 +14,7 @@ export default function GamecoinBalance() {
 
     setBalance(null)
     setError('')
+    onBalanceChange?.(null)
 
     if (!connected || !address || !requestAssets) return
 
@@ -38,10 +39,12 @@ export default function GamecoinBalance() {
           .replace(/0+$/, '')
 
         if (!cancelled) {
+          onBalanceChange?.(total)
           setBalance(fraction ? `${whole}.${fraction}` : String(whole))
         }
       } catch (e) {
         if (!cancelled) {
+          onBalanceChange?.(null)
           setError(e instanceof Error ? e.message : String(e))
         }
       }
@@ -49,7 +52,7 @@ export default function GamecoinBalance() {
 
     void load()
     return () => { cancelled = true }
-  }, [connected, address, requestAssets])
+  }, [connected, address, requestAssets, onBalanceChange])
 
   if (!connected) return null
 

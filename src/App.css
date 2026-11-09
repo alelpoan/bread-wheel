@@ -315,3 +315,27 @@
     font-size: 22px;
   }
 }
+
+/* Bread Wheel: consistent participant card widths */
+.players .player {
+  box-sizing: border-box;
+  width: 128px;
+  min-width: 128px;
+  max-width: 128px;
+  overflow-wrap: anywhere;
+}
+/* Bread Wheel participant card layout */
+.players .player {
+    box-sizing: border-box;
+    width: 140px;
+    min-width: 140px;
+    max-width: 140px;
+    overflow-wrap: normal;
+}
+.players .player input[type="number"] {
+    min-width: 0;
+}
+.players .player button {
+    white-space: nowrap;
+    flex-shrink: 0;
+}
