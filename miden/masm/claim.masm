@@ -1,12 +1,12 @@
-﻿# Bread Wheel - single-player claim prototype
-#
-# Expected note storage:
-#   0: owner account suffix
-#   1: owner account prefix
-#   2..3: reserved
-#
-# Only the specified owner may consume the note.
-# This module is not yet a complete roulette contract.
+﻿#! Bread Wheel - single-player claim prototype
+#!
+#! Expected note storage:
+#!   0: owner account suffix
+#!   1: owner account prefix
+#!   2..3: reserved
+#!
+#! Only the specified owner may consume the note.
+#! This module is not yet a complete roulette contract.
 
 use miden::protocol::active_account
 use miden::protocol::active_note
@@ -26,3 +26,4 @@ pub proc claim_owner
 
     exec.basic::move_note_assets_to_account
 end
+
