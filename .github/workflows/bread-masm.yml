@@ -1,4 +1,4 @@
-name: Bread Wheel MASM Build
+﻿name: Bread Wheel MASM Build
 
 on:
   workflow_dispatch:
@@ -62,3 +62,35 @@ jobs:
         working-directory: geoquizz
         run: cargo +nightly-2026-09-01 run --release --bin bread_stake
 
+
+      - name: Create Bread Wheel CLAIM compiler
+        shell: bash
+        run: |
+          cat > geoquizz/integration/src/bin/bread_claim.rs <<'RS'
+          use anyhow::Result;
+          use miden_standards::code_builder::CodeBuilder;
+
+          fn main() -> Result<()> {
+              let module = include_str!("../../../../bread-wheel/miden/masm/claim.masm");
+              let script = r#"
+          use {NoteArgs} from miden::protocol::types
+          use bread::claim
+
+          @note_script
+          pub proc main(args: NoteArgs)
+              exec.claim::claim_owner
+          end
+          "#;
+
+              let builder = CodeBuilder::default()
+                  .with_linked_module("bread::claim", module)?;
+
+              let compiled = builder.compile_note_script(script)?;
+              println!("Bread Wheel CLAIM script root: {}", compiled.root());
+              Ok(())
+          }
+          RS
+
+      - name: Compile Bread Wheel CLAIM
+        working-directory: geoquizz
+        run: cargo +nightly-2026-09-01 run --release --bin bread_claim
