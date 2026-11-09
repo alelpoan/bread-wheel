@@ -304,3 +304,105 @@ async fn mixed_recipient_notes_cannot_be_claimed_as_one_pot() -> Result<()> {
     println!("PASS: cannot claim two notes with different authorized recipients");
     Ok(())
 }
+
+
+// Bread Wheel round accounting prototype (OFF-CHAIN MODEL ONLY).
+// These tests validate accounting invariants; they do NOT lock Gamecoin on Miden.
+#[cfg(test)]
+mod pool_accounting_tests {
+    use std::collections::BTreeMap;
+
+    #[derive(Default)]
+    struct RoundPool {
+        stakes: BTreeMap<u64, u64>,
+        closed: bool,
+        winner: Option<u64>,
+        claimed: bool,
+    }
+
+    impl RoundPool {
+        fn stake(&mut self, player: u64, amount: u64) -> Result<(), &'static str> {
+            if self.closed { return Err("round closed"); }
+            if amount == 0 { return Err("zero stake"); }
+            let prior = self.stakes.get(&player).copied().unwrap_or(0);
+            let updated = prior.checked_add(amount).ok_or("stake overflow")?;
+            self.stakes.insert(player, updated);
+            Ok(())
+        }
+        fn pot(&self) -> Result<u64, &'static str> {
+            self.stakes.values().try_fold(0u64, |sum, value| sum.checked_add(*value).ok_or("pot overflow"))
+        }
+        fn close(&mut self) -> Result<(), &'static str> {
+            if self.closed { return Err("already closed"); }
+            if self.stakes.is_empty() { return Err("no stakes"); }
+            self.pot()?;
+            self.closed = true;
+            Ok(())
+        }
+        // The winning ID is supplied by the test harness, NOT by verified randomness.
+        fn settle(&mut self, winner: u64) -> Result<(), &'static str> {
+            if !self.closed { return Err("round open"); }
+            if self.winner.is_some() { return Err("already settled"); }
+            if !self.stakes.contains_key(&winner) { return Err("winner not a bettor"); }
+            self.winner = Some(winner);
+            Ok(())
+        }
+        fn claim(&mut self, caller: u64) -> Result<u64, &'static str> {
+            if self.winner != Some(caller) { return Err("not the winner or unsettled"); }
+            if self.claimed { return Err("already claimed"); }
+            let amount = self.pot()?;
+            self.claimed = true;
+            Ok(amount)
+        }
+    }
+
+    #[test]
+    fn two_bettors_accumulate_one_pot_and_only_winner_claims_once() {
+        let mut pool = RoundPool::default();
+        pool.stake(101, 1_000_000).unwrap();
+        pool.stake(202, 2_000_000).unwrap();
+        assert_eq!(pool.pot().unwrap(), 3_000_000);
+        assert!(pool.claim(101).is_err());
+        pool.close().unwrap();
+        assert!(pool.stake(303, 1).is_err());
+        pool.settle(202).unwrap();
+        assert!(pool.claim(101).is_err());
+        assert_eq!(pool.claim(202).unwrap(), 3_000_000);
+        assert!(pool.claim(202).is_err());
+    }
+
+    #[test]
+    fn repeat_stakes_add_without_creating_duplicate_players() {
+        let mut pool = RoundPool::default();
+        pool.stake(101, 1_000_000).unwrap();
+        pool.stake(101, 500_000).unwrap();
+        pool.stake(202, 1_000_000).unwrap();
+        assert_eq!(pool.stakes.len(), 2);
+        assert_eq!(pool.stakes[&101], 1_500_000);
+        assert_eq!(pool.pot().unwrap(), 2_500_000);
+    }
+
+    #[test]
+    fn invalid_transitions_and_non_bettor_winner_are_rejected() {
+        let mut pool = RoundPool::default();
+        assert!(pool.stake(101, 0).is_err());
+        assert!(pool.close().is_err());
+        pool.stake(101, 1).unwrap();
+        assert!(pool.settle(101).is_err());
+        pool.close().unwrap();
+        assert!(pool.close().is_err());
+        assert!(pool.settle(999).is_err());
+        pool.settle(101).unwrap();
+        assert!(pool.settle(101).is_err());
+    }
+
+    #[test]
+    fn checked_arithmetic_rejects_overflow() {
+        let mut pool = RoundPool::default();
+        pool.stake(101, u64::MAX).unwrap();
+        assert!(pool.stake(101, 1).is_err());
+        pool.stake(202, 1).unwrap();
+        assert!(pool.pot().is_err());
+        assert!(pool.close().is_err());
+    }
+}
