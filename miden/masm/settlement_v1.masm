@@ -1,0 +1,61 @@
+#! Bread Wheel settlement_v1 — EXPERIMENTAL, DO NOT FUND.
+#! Note bounded storage (7 felts):
+#! [owner_suffix, owner_prefix, winner_suffix, winner_prefix,
+#!  round_id, settlement_start_block, refund_after_block]
+#! Winner is selected offchain and NOT authenticated by this script.
+#! A malicious note creator can select themselves as winner.
+#! Winner may claim in [settlement_start_block, refund_after_block).
+#! Original staker may refund at or after refund_after_block.
+#! The two paths are time-disjoint; note consumption is single-use.
+
+use miden::protocol::active_account
+use miden::protocol::active_note
+use miden::protocol::account_id
+use miden::protocol::tx
+use miden::standards::wallets::basic
+
+const ERR_NOT_WINNER = "wheel settlement: account is not committed winner"
+const ERR_NOT_OWNER = "wheel settlement: account is not original staker"
+const ERR_BEFORE_SETTLEMENT = "wheel settlement: settlement window not open"
+const ERR_SETTLEMENT_EXPIRED = "wheel settlement: winner claim window expired"
+const ERR_REFUND_EARLY = "wheel settlement: refund deadline not reached"
+
+# Consume a note only from the committed winner account, and only during
+# the winner-claim interval. This does NOT verify who chose the winner.
+pub proc claim_committed_winner
+    push.7 push.0
+    exec.active_note::get_bounded_storage
+    eq.7 assert
+
+    mem_load.3 mem_load.2
+    exec.active_account::get_id
+    exec.account_id::eq
+    assert.err=ERR_NOT_WINNER
+
+    # reference >= settlement_start
+    exec.tx::get_reference_block_number mem_load.5
+    lt assertz.err=ERR_BEFORE_SETTLEMENT
+
+    # reference < refund_after
+    exec.tx::get_reference_block_number mem_load.6
+    lt assert.err=ERR_SETTLEMENT_EXPIRED
+
+    exec.basic::move_note_assets_to_account
+end
+
+# Original staker may recover assets only once the winner window expires.
+pub proc refund_owner_after_expiry
+    push.7 push.0
+    exec.active_note::get_bounded_storage
+    eq.7 assert
+
+    mem_load.1 mem_load.0
+    exec.active_account::get_id
+    exec.account_id::eq
+    assert.err=ERR_NOT_OWNER
+
+    exec.tx::get_reference_block_number mem_load.6
+    lt assertz.err=ERR_REFUND_EARLY
+
+    exec.basic::move_note_assets_to_account
+end
