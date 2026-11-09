@@ -1,4 +1,5 @@
-﻿import { StrictMode, useCallback, useState } from 'react'
+import StakeArtifactPreflight from './StakeArtifactPreflight.tsx'
+import { StrictMode, useCallback, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { MidenProvider } from '@miden-sdk/react'
 import { MidenFiSignerProvider } from '@miden-sdk/miden-wallet-adapter-react'
@@ -39,6 +40,7 @@ function GameWithBalance() {
           <RealWalletProfile balanceBaseUnits={balance} />
           <div id="bread-demo-wallet-slot" className="bread-demo-wallet-slot" />
           <RealStakePreview balanceBaseUnits={balance} />
+          <StakeArtifactPreflight />
           <RoundRulesPreview />
           <div className="bread-safety-note">Real Gamecoin betting is not enabled. The wheel and demo balances are simulations.</div>
         </aside>
