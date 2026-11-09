@@ -4,6 +4,9 @@ import { buildStakeTransactionRequest } from './StakeTransactionRequest'
 import type { StakeDraft } from './StakeNoteDraft'
 
 const EXPECTED_SHA256 = '830cd8f890bc24b511dd0979ff7a62857fd2e71ed2f68ca2685918be26ed4617'
+const RPC_ENDPOINT = 'https://rpc.cedar.miden.io'
+// 120 blocks is a safety margin, NOT a guaranteed wall-clock duration.
+const REFUND_DELAY_BLOCKS = 120
 
 async function verifyArtifact(): Promise<string> {
   const response = await fetch('/stake-note.bin', { cache: 'no-store' })
@@ -16,33 +19,43 @@ async function verifyArtifact(): Promise<string> {
   return hash
 }
 
-/** Builds an actual SDK TransactionRequest but never hands it to the wallet.
- * The present MASM script only supports an owner refund; no winner settlement.
- */
+async function readCurrentBlock(): Promise<number> {
+  // Separate read-only client. Never signs or submits any transaction.
+  const { MidenClient } = await import('@miden-sdk/miden-sdk')
+  const client = await MidenClient.create({ rpcUrl: RPC_ENDPOINT })
+  try {
+    await client.sync()
+    const height = await client.getSyncHeight()
+    if (!Number.isSafeInteger(height) || height < 1) throw new Error('RPC did not provide a valid current block height')
+    return height
+  } finally {
+    client.terminate()
+  }
+}
+
+/** Local request construction only. No Gamecoin is transferred. */
 export default function StakeArtifactPreflight() {
   const wallet = useMidenFiWallet()
   const { connected, address } = wallet
-  const [roundId, setRoundId] = useState('1')
-  const [refundBlock, setRefundBlock] = useState('')
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<StakeDraft | null>(null)
   const [hash, setHash] = useState('')
+  const [chainBlock, setChainBlock] = useState<number | null>(null)
   const [error, setError] = useState('')
   const walletHasRequestTransaction = 'requestTransaction' in wallet && typeof wallet.requestTransaction === 'function'
 
   async function prepare() {
-    setBusy(true); setError(''); setResult(null); setHash('')
+    setBusy(true); setError(''); setResult(null); setHash(''); setChainBlock(null)
     try {
       if (!connected || !address) throw new Error('Connect Bread Wallet first.')
-      const round = Number(roundId)
-      const deadline = Number(refundBlock)
-      if (!Number.isSafeInteger(round) || round < 0) throw new Error('Invalid round ID')
-      if (!Number.isSafeInteger(deadline) || deadline < 1) throw new Error('Enter a verified future refund block. No block is guessed automatically.')
       const verifiedHash = await verifyArtifact()
-      const { draft, request } = await buildStakeTransactionRequest(address, 1, round, deadline)
+      const current = await readCurrentBlock()
+      const deadline = current + REFUND_DELAY_BLOCKS
+      if (!Number.isSafeInteger(deadline)) throw new Error('Refund block is outside the safe integer range')
+      // Round 1 is explicitly a TEST value, not the live roulette round.
+      const { draft, request } = await buildStakeTransactionRequest(address, 1, 1, deadline)
       if (!request) throw new Error('SDK did not create a transaction request.')
-      setHash(verifiedHash)
-      setResult(draft)
+      setChainBlock(current); setHash(verifiedHash); setResult(draft)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally { setBusy(false) }
@@ -50,22 +63,22 @@ export default function StakeArtifactPreflight() {
 
   return <section style={{ border: '1px solid #a6a6a6', borderRadius: 12, padding: 16, marginTop: 16, background: '#fff', color: '#222' }}>
     <h3 style={{ marginTop: 0 }}>MASM Note — transaction preparation</h3>
-    <p style={{ fontSize: 13 }}>Verifies the compiled script and builds an actual SDK TransactionRequest for 1 GC. No transaction is signed, submitted, or sent to Bread Wallet.</p>
+    <p style={{ fontSize: 13 }}>Reads the current Miden block, calculates a future refund block, verifies the MASM artifact and builds a local SDK request for 1 GC. No transaction is signed or sent.</p>
     <p style={{ fontSize: 12 }}>Wallet transaction API: {walletHasRequestTransaction ? 'requestTransaction available' : 'requestTransaction not exposed by this adapter'}</p>
-    <label>Round ID <input type="number" min="0" step="1" value={roundId} onChange={e => setRoundId(e.target.value)} style={{ display: 'block', width: '100%', marginBottom: 8 }} /></label>
-    <label>Refund after block <input type="number" min="1" step="1" value={refundBlock} onChange={e => setRefundBlock(e.target.value)} placeholder="Enter a verified future block" style={{ display: 'block', width: '100%', marginBottom: 8 }} /></label>
-    <button type="button" disabled={!connected || busy} onClick={() => void prepare()}>{busy ? 'Preparing…' : 'BUILD LOCAL TRANSACTION REQUEST'}</button>
+    <button type="button" disabled={!connected || busy} onClick={() => void prepare()}>{busy ? 'PREPARING…' : 'BUILD LOCAL TRANSACTION REQUEST'}</button>
     {!connected && <p>Connect Bread Wallet first.</p>}
     {error && <p role="alert" style={{ color: '#b42318', overflowWrap: 'anywhere' }}>{error}</p>}
     {result && <div role="status" style={{ fontSize: 12, overflowWrap: 'anywhere' }}>
       <p><b>SDK TransactionRequest built locally. Nothing sent.</b></p>
+      <p>Current chain block: {chainBlock}</p>
+      <p>Refund after block: {result.refundAfterBlock} (+{REFUND_DELAY_BLOCKS} blocks)</p>
+      <p>Round ID: {result.roundId} (test only)</p>
       <p>Amount: {result.amountGC} GC ({result.amountBaseUnits} base units)</p>
       <p>Note ID: {result.noteId}</p>
       <p>Script root: {result.scriptRoot}</p>
       <p>Owner: {result.owner}</p>
-      <p>Refund block: {result.refundAfterBlock}</p>
       <p>Verified SHA-256: {hash}</p>
-      <p><b>Real transfer disabled:</b> no proven network refund consumption or winner payout.</p>
+      <p><b>Real transfer disabled:</b> refund consumption and winner payouts are not network-verified.</p>
     </div>}
   </section>
 }
