@@ -1,4 +1,4 @@
-﻿name: Bread Wheel MASM Build
+name: Bread Wheel MASM Build
 
 on:
   workflow_dispatch:
@@ -44,7 +44,7 @@ jobs:
           @note_script
           pub proc main(args: NoteArgs)
               push.1
-              exec.stake::valid_stake
+              exec.stake::refund_owner_after_deadline
               assert
           end
           "#;
