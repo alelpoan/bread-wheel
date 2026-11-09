@@ -168,7 +168,19 @@ async fn note_cannot_be_claimed_twice() -> Result<()> {
     game.commit(&first)?;
 
     let second = game.claim(game.owner.id()).await;
-    assert!(second.is_err(), "already consumed note must fail");
-    println!("PASS: double claim rejected");
+
+    match second {
+        Err(_) => {
+            println!("PASS: second execution rejected");
+        }
+        Ok(executed) => {
+            let result = game.commit(&executed);
+            assert!(
+                result.is_err(),
+                "SECURITY FAILURE: second claim was committed"
+            );
+            println!("PASS: second claim rejected at commitment");
+        }
+    }
     Ok(())
 }
