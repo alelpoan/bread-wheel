@@ -1,0 +1,43 @@
+name: Bread Wheel CLAIM Execution Tests
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'miden/tests/**'
+      - 'miden/masm/claim.masm'
+      - '.github/workflows/bread-claim-test.yml'
+  workflow_dispatch:
+
+jobs:
+  test-claim:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout Bread Wheel
+        uses: actions/checkout@v4
+
+      - name: Install Rust nightly
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-09-01
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Checkout GeoQuizz reference
+        uses: actions/checkout@v4
+        with:
+          repository: guelowrd/gq-thegamenotthemagazine
+          ref: 32854f907f305a6df49041fbc8ed4432e8ffafb0
+          path: geoquizz-reference
+
+      - name: Install Bread Wheel test files
+        run: |
+          cp miden/masm/claim.masm geoquizz-reference/masm/bread_claim.masm
+          cp miden/tests/wheel_claim_test.rs geoquizz-reference/integration/tests/wheel_claim_test.rs
+
+      - name: Execute CLAIM tests on MockChain
+        working-directory: geoquizz-reference/integration
+        run: cargo +nightly-2026-09-01 test --test wheel_claim_test -- --nocapture
