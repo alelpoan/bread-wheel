@@ -184,3 +184,70 @@ async fn note_cannot_be_claimed_twice() -> Result<()> {
     }
     Ok(())
 }
+#[tokio::test(flavor = "multi_thread")]
+async fn two_players_one_transaction_two_gc_to_winner() -> Result<()> {
+    let mut game = setup()?;
+
+    // Player A publishes the first 1 GC stake.
+    game.publish().await?;
+
+    // Player B creates a second 1 GC stake.
+    // Both notes name player A as the test recipient.
+    let script = CodeBuilder::default()
+        .with_linked_module("bread::claim", CLAIM_MODULE)?
+        .compile_note_script(CLAIM_SCRIPT)?;
+
+    let storage = vec![
+        game.owner.id().suffix(),
+        game.owner.id().prefix().as_felt(),
+    ];
+
+    let mut rng = StdRng::seed_from_u64(98765);
+
+    let second_note = NoteBuilder::new(game.stranger.id(), &mut rng)
+        .script(script)
+        .note_storage(storage)?
+        .add_assets([FungibleAsset::new(game.faucet, UNIT)?.into()])
+        .note_type(NoteType::Public)
+        .build()?;
+
+    let send_script = SendNotesTransactionScript::new(
+        &game.stranger.code_interface(),
+        &[PartialNote::from(second_note.clone())],
+    )?;
+
+    let published = game.chain
+        .build_transaction(game.stranger.id())
+        .send_notes_script(&send_script)
+        .expected_output_note(RawOutputNote::Full(second_note.clone()))
+        .build()?
+        .execute()
+        .await?;
+
+    game.commit(&published)?;
+
+    // One transaction consumes BOTH notes.
+    let before = game.balance(game.owner.id());
+
+    let payout = game.chain
+        .build_transaction(game.owner.id())
+        .authenticated_input_note(game.note.id())
+        .authenticated_input_note(second_note.id())
+        .build()?
+        .execute()
+        .await?;
+
+    game.commit(&payout)?;
+
+    assert_eq!(
+        game.balance(game.owner.id()),
+        before + 2 * UNIT,
+        "Winner must receive exactly 2 GC"
+    );
+
+    println!("PASS: two players funded two notes");
+    println!("PASS: one transaction consumed both notes");
+    println!("PASS: winner received exactly 2 test GC");
+
+    Ok(())
+}
