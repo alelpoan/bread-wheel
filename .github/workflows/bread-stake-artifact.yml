@@ -1,0 +1,72 @@
+name: Bread Wheel Stake Script Artifact (experimental)
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'miden/masm/stake.masm'
+      - '.github/workflows/bread-stake-artifact.yml'
+
+jobs:
+  artifact:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout Bread Wheel
+        uses: actions/checkout@v4
+        with:
+          path: bread-wheel
+      - name: Checkout pinned GeoQuizz compiler environment
+        uses: actions/checkout@v4
+        with:
+          repository: guelowrd/gq-thegamenotthemagazine
+          ref: 32854f907f305a6df49041fbc8ed4432e8ffafb0
+          path: geoquizz
+      - name: Install pinned Rust
+        run: rustup toolchain install nightly-2026-09-01 --profile minimal
+      - name: Write artifact compiler
+        shell: bash
+        run: |
+          mkdir -p geoquizz/integration/src/bin
+          cat > geoquizz/integration/src/bin/bread_stake_artifact.rs <<'RS'
+          use anyhow::Result;
+          use miden_standards::code_builder::CodeBuilder;
+          use miden_core::utils::Serializable;
+
+          fn main() -> Result<()> {
+              let module = include_str!("../../../../bread-wheel/miden/masm/stake.masm");
+              let script = r#"
+          use {NoteArgs} from miden::protocol::types
+          use bread::stake
+
+          @note_script
+          pub proc main(args: NoteArgs)
+              push.1
+              exec.stake::refund_owner_after_deadline
+              assert
+          end
+          "#;
+              let builder = CodeBuilder::default().with_linked_module("bread::stake", module)?;
+              let compiled = builder.compile_note_script(script)?;
+              std::fs::create_dir_all("../bread-wheel-artifacts")?;
+              let path = "../bread-wheel-artifacts/stake-note.bin";
+              std::fs::write(path, compiled.to_bytes())?;
+              println!("Stake note root: {}", compiled.root());
+              println!("Serialized stake note written to {}", path);
+              Ok(())
+          }
+          RS
+      - name: Compile and serialize note script
+        working-directory: geoquizz
+        run: cargo +nightly-2026-09-01 run --release --bin bread_stake_artifact
+      - name: Verify artifact exists and is nonempty
+        shell: bash
+        run: |
+          test -s geoquizz/bread-wheel-artifacts/stake-note.bin
+          sha256sum geoquizz/bread-wheel-artifacts/stake-note.bin | tee geoquizz/bread-wheel-artifacts/stake-note.sha256
+      - name: Upload artifact (NOT approved for real GC)
+        uses: actions/upload-artifact@v4
+        with:
+          name: bread-wheel-stake-script-experimental
+          path: geoquizz/bread-wheel-artifacts/
+          if-no-files-found: error
