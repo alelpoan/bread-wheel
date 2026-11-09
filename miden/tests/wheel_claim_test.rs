@@ -251,3 +251,56 @@ async fn two_players_one_transaction_two_gc_to_winner() -> Result<()> {
 
     Ok(())
 }
+// Security boundary: two notes with different recipients are NOT a shared pot.
+// A player cannot take the other player's note merely by grouping them in one tx.
+#[tokio::test(flavor = "multi_thread")]
+async fn mixed_recipient_notes_cannot_be_claimed_as_one_pot() -> Result<()> {
+    let mut game = setup()?;
+    game.publish().await?;
+
+    let script = CodeBuilder::default()
+        .with_linked_module("bread::claim", CLAIM_MODULE)?
+        .compile_note_script(CLAIM_SCRIPT)?;
+
+    let storage = vec![
+        game.stranger.id().suffix(),
+        game.stranger.id().prefix().as_felt(),
+    ];
+    let mut rng = StdRng::seed_from_u64(20261109);
+    let stranger_note = NoteBuilder::new(game.stranger.id(), &mut rng)
+        .script(script)
+        .note_storage(storage)?
+        .add_assets([FungibleAsset::new(game.faucet, UNIT)?.into()])
+        .note_type(NoteType::Public)
+        .build()?;
+
+    let send_script = SendNotesTransactionScript::new(
+        &game.stranger.code_interface(),
+        &[PartialNote::from(stranger_note.clone())],
+    )?;
+    let published = game.chain
+        .build_transaction(game.stranger.id())
+        .send_notes_script(&send_script)
+        .expected_output_note(RawOutputNote::Full(stranger_note.clone()))
+        .build()?
+        .execute()
+        .await?;
+    game.commit(&published)?;
+
+    let owner_before = game.balance(game.owner.id());
+    let stranger_before = game.balance(game.stranger.id());
+
+    let attempted_theft = game.chain
+        .build_transaction(game.owner.id())
+        .authenticated_input_note(game.note.id())
+        .authenticated_input_note(stranger_note.id())
+        .build()?
+        .execute()
+        .await;
+
+    assert!(attempted_theft.is_err(), "owner must not consume a note assigned to stranger");
+    assert_eq!(game.balance(game.owner.id()), owner_before);
+    assert_eq!(game.balance(game.stranger.id()), stranger_before);
+    println!("PASS: cannot claim two notes with different authorized recipients");
+    Ok(())
+}
