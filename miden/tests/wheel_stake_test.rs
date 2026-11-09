@@ -100,7 +100,9 @@ impl Game {
 #[tokio::test(flavor = "multi_thread")]
 async fn stake_note_can_be_published() -> Result<()> {
     let mut g = setup(u32::MAX)?;
+    let before = g.balance(g.owner.id());
     g.publish().await?;
+    assert_eq!(g.balance(g.owner.id()), before - UNIT, "publishing must lock exactly 1 GC");
     assert!(g.refund(g.owner.id()).await.is_err(), "stake must remain locked");
     println!("PASS: stake note published and locked");
     Ok(())
@@ -110,7 +112,9 @@ async fn stake_note_can_be_published() -> Result<()> {
 async fn owner_cannot_refund_before_deadline() -> Result<()> {
     let mut g = setup(u32::MAX)?;
     g.publish().await?;
+    let before = g.balance(g.owner.id());
     assert!(g.refund(g.owner.id()).await.is_err(), "early refund must fail");
+    assert_eq!(g.balance(g.owner.id()), before, "failed refund must not change balance");
     println!("PASS: owner cannot refund early");
     Ok(())
 }
@@ -129,15 +133,19 @@ async fn stranger_cannot_refund_even_after_deadline() -> Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 async fn owner_can_refund_after_deadline_once() -> Result<()> {
     let mut g = setup(0)?;
+    let initial = g.balance(g.owner.id());
     g.publish().await?;
     let before = g.balance(g.owner.id());
+    assert_eq!(before, initial - UNIT, "published stake must debit 1 GC");
     let tx = g.refund(g.owner.id()).await?;
     g.commit(&tx)?;
     assert_eq!(g.balance(g.owner.id()), before + UNIT);
+    assert_eq!(g.balance(g.owner.id()), initial, "refund must restore initial balance");
     let again = g.refund(g.owner.id()).await;
     if let Ok(tx2) = again {
         assert!(g.commit(&tx2).is_err(), "second refund must not commit");
     }
+    assert_eq!(g.balance(g.owner.id()), initial, "second attempt must not mint GC");
     println!("PASS: owner refund 1 GC, no double spend");
     Ok(())
 }
