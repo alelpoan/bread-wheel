@@ -1,0 +1,19 @@
+name: Bread Wheel Stake Source Integrity
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'miden/masm/stake.masm'
+      - 'miden/tests/wheel_stake_test.rs'
+      - '.github/workflows/bread-masm.yml'
+      - '.github/workflows/bread-stake-test.yml'
+      - '.github/workflows/bread-stake-integrity.yml'
+      - 'scripts/check_stake_contract.py'
+  workflow_dispatch:
+jobs:
+  integrity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify current contract is the one built and tested
+        run: python3 scripts/check_stake_contract.py
