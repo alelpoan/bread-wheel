@@ -47,6 +47,7 @@ async fn three_stakes_can_be_claimed_by_same_recipient_without_double_spend() ->
     let script = CodeBuilder::default().with_linked_module("bread::settlement", MODULE)?.compile_note_script(WINNER_SCRIPT)?;
     let mut rng = StdRng::seed_from_u64(20261109);
     let mut notes = Vec::new();
+    let initial_owners: Vec<u64> = owners.iter().map(|a| balance(&chain, faucet, a.id())).collect();
     let initial_winner = balance(&chain, faucet, winner.id());
     for (i, owner) in owners.iter().enumerate() {
         let storage = vec![owner.id().suffix(), owner.id().prefix().as_felt(), winner.id().suffix(), winner.id().prefix().as_felt(), 59u32.into(), 0u32.into(), u32::MAX.into()];
@@ -55,6 +56,7 @@ async fn three_stakes_can_be_claimed_by_same_recipient_without_double_spend() ->
             .note_type(NoteType::Public).build()?;
         publish(&mut chain, owner, &note).await?;
         notes.push(note);
+        assert_eq!(balance(&chain, faucet, owner.id()), initial_owners[i] - (i as u64 + 1) * UNIT, "deposit must debit actual owner");
     }
     assert_eq!(notes.len(), 3);
     // Only the precommitted winner may spend any of the notes.
@@ -66,6 +68,9 @@ async fn three_stakes_can_be_claimed_by_same_recipient_without_double_spend() ->
         commit(&mut chain, &tx)?;
     }
     assert_eq!(balance(&chain, faucet, winner.id()), initial_winner + 6 * UNIT);
+    for (i, owner) in owners.iter().enumerate() {
+        assert_eq!(balance(&chain, faucet, owner.id()), initial_owners[i] - (i as u64 + 1) * UNIT, "owner must not receive an unauthorized refund");
+    }
     // A committed spend cannot be committed again.
     for note in &notes {
         if let Ok(tx) = chain.build_transaction(winner.id()).authenticated_input_note(note.id()).build()?.execute().await {
