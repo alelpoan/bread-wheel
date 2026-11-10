@@ -25,8 +25,8 @@ pub proc claim_ticket_winner
     mem_load.10 push.0 eq assertz.err=ERR_ZERO_WEIGHT
 
     # Ticket must lie in [0, A+B+C), using checked u32 arithmetic.
-    mem_load.8 mem_load.9 u32checked_add
-    mem_load.10 u32checked_add
+    mem_load.8 mem_load.9 u32checked.add
+    mem_load.10 u32checked.add
     mem_load.11 swap lt assert.err=ERR_BAD_TICKET
 
     # Ticket < A => A; else ticket < A+B => B; else C.
@@ -34,7 +34,7 @@ pub proc claim_ticket_winner
     if.true
         mem_load.3 mem_load.2
     else
-        mem_load.8 mem_load.9 u32checked_add
+        mem_load.8 mem_load.9 u32checked.add
         mem_load.11 swap lt
         if.true
             mem_load.5 mem_load.4
