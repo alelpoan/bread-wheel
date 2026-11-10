@@ -25,7 +25,7 @@ fn commit(chain: &mut MockChain, tx: &ExecutedTransaction) -> Result<()> {
     chain.prove_next_block()?;
     Ok(())
 }
-async fn scenario(ticket: u32, expected: Option<usize>) -> Result<()> {
+async fn scenario_with_weights(ticket: u32, weights: [u32; 3], expected: Option<usize>) -> Result<()> {
     let mut b = MockChain::builder();
     let faucet = b.add_existing_basic_faucet(auth(), "GC", 1000_000_000, None)?.id();
     let owner = b.add_existing_wallet_with_assets(auth(), [FungibleAsset::new(faucet, 6_000_000)?.into()])?;
@@ -35,7 +35,7 @@ async fn scenario(ticket: u32, expected: Option<usize>) -> Result<()> {
     let script = CodeBuilder::default().with_linked_module("bread::ticket", MODULE)?.compile_note_script(SCRIPT)?;
     let mut storage = vec![owner.id().suffix(), owner.id().prefix().as_felt()];
     for p in &players { storage.extend([p.id().suffix(), p.id().prefix().as_felt()]); }
-    storage.extend([1u32.into(), 2u32.into(), 3u32.into(), ticket.into()]);
+    storage.extend([weights[0].into(), weights[1].into(), weights[2].into(), ticket.into()]);
     let mut rng = StdRng::seed_from_u64(20261110 + ticket as u64);
     let note = NoteBuilder::new(owner.id(), &mut rng).script(script).note_storage(storage)?
         .add_assets([FungibleAsset::new(faucet, 6_000_000)?.into()]).note_type(NoteType::Public).build()?;
@@ -56,6 +56,18 @@ async fn scenario(ticket: u32, expected: Option<usize>) -> Result<()> {
     assert!(expected.is_none());
     Ok(())
 }
+async fn scenario(ticket: u32, expected: Option<usize>) -> Result<()> {
+    scenario_with_weights(ticket, [1, 2, 3], expected).await
+}
+
+#[tokio::test(flavor="multi_thread")]
+async fn rejects_zero_weight_participants() -> Result<()> {
+    scenario_with_weights(0, [0, 2, 3], None).await?;
+    scenario_with_weights(0, [1, 0, 3], None).await?;
+    scenario_with_weights(0, [1, 2, 0], None).await?;
+    Ok(())
+}
+
 #[tokio::test(flavor="multi_thread")]
 async fn weighted_ticket_boundaries() -> Result<()> {
     scenario(0,Some(0)).await?;
