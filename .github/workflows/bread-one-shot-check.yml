@@ -17,4 +17,4 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node scripts/test-reference.mjs
+      - run: node --test miden/fairness/*.test.mjs miden/settlement/*.test.mjs
