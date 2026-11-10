@@ -1,0 +1,17 @@
+name: Bread Wheel fairness transcript reference (NOT onchain)
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - 'miden/fairness/**'
+      - '.github/workflows/bread-fairness-reference.yml'
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test miden/fairness/verify-round.test.mjs
