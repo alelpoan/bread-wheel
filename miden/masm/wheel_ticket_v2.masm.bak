@@ -1,0 +1,49 @@
+#! Bread Wheel weighted-ticket authorization prototype (NOT a randomness oracle).
+#! Bounded note storage: 12 felts
+#! 0..1 owner id; 2..3 player A id; 4..5 player B id; 6..7 player C id
+#! 8 stake A tickets; 9 stake B tickets; 10 stake C tickets; 11 drawn ticket
+#! Ticket is supplied by note author. This script DOES NOT authenticate its source.
+#! The contract only derives the winner from immutable note storage.
+use miden::protocol::active_account
+use miden::protocol::active_note
+use miden::protocol::account_id
+use miden::standards::wallets::basic
+
+const ERR_BAD_STORAGE = "wheel: expected 12 fields"
+const ERR_ZERO_WEIGHT = "wheel: zero ticket weight is forbidden"
+const ERR_BAD_TICKET = "wheel: ticket outside weighted pot"
+const ERR_NOT_WINNER = "wheel: caller is not selected winner"
+
+pub proc claim_ticket_winner
+    push.12 push.0
+    exec.active_note::get_bounded_storage
+    eq.12 assert.err=ERR_BAD_STORAGE
+
+    # Each participant must have a strictly positive ticket weight.
+    mem_load.8 push.0 eq assertz.err=ERR_ZERO_WEIGHT
+    mem_load.9 push.0 eq assertz.err=ERR_ZERO_WEIGHT
+    mem_load.10 push.0 eq assertz.err=ERR_ZERO_WEIGHT
+
+    # Ticket must lie in [0, A+B+C), using checked u32 arithmetic.
+    mem_load.8 mem_load.9 u32checked.add
+    mem_load.10 u32checked.add
+    mem_load.11 swap lt assert.err=ERR_BAD_TICKET
+
+    # Ticket < A => A; else ticket < A+B => B; else C.
+    mem_load.11 mem_load.8 lt
+    if.true
+        mem_load.3 mem_load.2
+    else
+        mem_load.8 mem_load.9 u32checked.add
+        mem_load.11 swap lt
+        if.true
+            mem_load.5 mem_load.4
+        else
+            mem_load.7 mem_load.6
+        end
+    end
+    exec.active_account::get_id
+    exec.account_id::eq
+    assert.err=ERR_NOT_WINNER
+    exec.basic::move_note_assets_to_account
+end
