@@ -1,0 +1,31 @@
+name: Bread Wheel weighted-ticket MASM MockChain (unsafe randomness prototype)
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - 'miden/masm/wheel_ticket_v2.masm'
+      - 'miden/tests/wheel_ticket_v2_test.rs'
+      - '.github/workflows/bread-ticket-v2.yml'
+jobs:
+  weighted-ticket:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-09-01
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/checkout@v4
+        with:
+          repository: guelowrd/gq-thegamenotthemagazine
+          ref: 32854f907f305a6df49041fbc8ed4432e8ffafb0
+          path: geoquizz-reference
+      - name: Copy module and integration test
+        run: |
+          cp miden/masm/wheel_ticket_v2.masm geoquizz-reference/masm/bread_ticket_v2.masm
+          cp miden/tests/wheel_ticket_v2_test.rs geoquizz-reference/integration/tests/wheel_ticket_v2_test.rs
+      - name: Compile and execute in MockChain
+        working-directory: geoquizz-reference/integration
+        run: cargo +nightly-2026-09-01 test --test wheel_ticket_v2_test -- --nocapture
