@@ -35,7 +35,7 @@ async fn scenario_with_weights(ticket: u32, weights: [u32; 3], expected: Option<
     let script = CodeBuilder::default().with_linked_module("bread::ticket", MODULE)?.compile_note_script(SCRIPT)?;
     let mut storage = vec![owner.id().suffix(), owner.id().prefix().as_felt()];
     for p in &players { storage.extend([p.id().suffix(), p.id().prefix().as_felt()]); }
-    storage.extend([weights[0].into(), weights[1].into(), weights[2].into(), ticket.into()]);
+    storage.extend([weights[0], weights[1], weights[2], ticket].map(miden_client::Felt::from));
     let mut rng = StdRng::seed_from_u64(20261110 + ticket as u64);
     let note = NoteBuilder::new(owner.id(), &mut rng).script(script).note_storage(storage)?
         .add_assets([FungibleAsset::new(faucet, 6_000_000)?.into()]).note_type(NoteType::Public).build()?;
