@@ -1,0 +1,26 @@
+name: Bread Wheel complete round reference (OFFCHAIN ONLY)
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - 'miden/protocol/**'
+      - 'miden/fairness/**'
+      - 'miden/settlement/**'
+      - '.github/workflows/bread-round-engine.yml'
+jobs:
+  reference-round:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: All offchain reference tests
+        run: node --test miden/protocol/*.test.mjs miden/fairness/*.test.mjs miden/settlement/*.test.mjs
+      - name: Guard against enabling wallet transfer in reference engine
+        run: |
+          if grep -E 'requestTransaction\(|sendTransaction\(' miden/protocol/round-engine.mjs; then
+            echo 'Reference engine must not send transactions'
+            exit 1
+          fi
