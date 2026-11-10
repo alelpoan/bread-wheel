@@ -40,10 +40,13 @@ export function selectWinner(round, entropyHex) {
   }
   throw new Error('Unreachable');
 }
-export function settle(round, winner, block) {
+export function settle(round, { winner, entropyHex }, block) {
   assert(round.status === 'closed' && block < round.refundBlock, 'Settlement window closed');
   assert(!round.settlement && round.consumed.size === 0, 'Already consumed');
-  assert(round.stakes.some(s => s.noteId === winner.noteId && s.owner === winner.owner), 'Invalid winner');
+  assert(typeof entropyHex === 'string' && hex64.test(entropyHex), 'Invalid entropy');
+  const derived = selectWinner(round, entropyHex);
+  assert(winner && winner.noteId === derived.noteId && winner.owner === derived.owner && winner.total === derived.total && winner.commitment === derived.commitment, 'Winner does not match verified draw');
+  // OFFCHAIN ONLY: the entropy is still supplied by caller, not authenticated onchain.
   // This model cannot verify entropy authenticity or Miden ownership proofs.
   round.stakes.forEach(s => round.consumed.add(s.noteId));
   round.settlement = { winner: winner.owner, amount: pot(round) };
